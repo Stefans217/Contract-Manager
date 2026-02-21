@@ -6,25 +6,16 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  try {
-    if (!process.env.DATABASE_URL) {
-      // No database configured - return a client that will fail gracefully
-      return new PrismaClient({
-        adapter: new PrismaPg({ connectionString: "postgresql://localhost/placeholder" }),
-        log: ["error"],
-      })
-    }
-    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
-    return new PrismaClient({
-      adapter,
-      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    })
-  } catch {
-    return new PrismaClient({
-      adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL || "postgresql://localhost/placeholder" }),
-      log: ["error"],
-    })
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL environment variable is not set. Please configure your database connection."
+    )
   }
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+  return new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  })
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
