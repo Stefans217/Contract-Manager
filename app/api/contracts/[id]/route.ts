@@ -83,8 +83,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         ...(data.status !== undefined && { status: data.status as ContractStatus }),
         ...(data.value !== undefined && { value: data.value }),
         ...(data.currency !== undefined && { currency: data.currency }),
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
+        // Preserve existing value when not provided; pass null to explicitly clear
+        ...(data.startDate !== undefined && { startDate: data.startDate ? new Date(data.startDate) : null }),
+        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
       },
     })
     if (contract.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 })
