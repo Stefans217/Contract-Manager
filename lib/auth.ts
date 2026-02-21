@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcryptjs from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { UserRole } from "@/generated/prisma"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -31,7 +32,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             user.password
           )
           if (!isValid) return null
-          return { id: user.id, email: user.email, name: user.name, image: user.image }
+          return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role }
         } catch {
           return null
         }
@@ -41,13 +42,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
+        token.id = user.id!
+        token.role = (user.role as UserRole) ?? UserRole.FREELANCER
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
+        session.user.role = token.role as UserRole
       }
       return session
     },

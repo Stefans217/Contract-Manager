@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
-import { ContractStatus } from "@prisma/client"
+import { ContractStatus, UserRole } from "@/generated/prisma"
+import { hasContractAccess, contractWhereForUser } from "@/lib/permissions"
 
 const updateContractSchema = z.object({
   title: z.string().min(1).optional(),
@@ -24,7 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const contract = await prisma.contract.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, ...contractWhereForUser(session.user.id, session.user.role) },
       include: {
         client: true,
         milestones: { orderBy: { dueDate: "asc" } },
@@ -36,6 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           include: { author: { select: { name: true } } },
           orderBy: { version: "desc" },
         },
+        user: { select: { name: true, email: true } },
       },
     })
     if (!contract) return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -51,6 +53,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (session.user.role !== UserRole.FREELANCER) {
+      return NextResponse.json({ error: "Only freelancers can edit contract terms" }, { status: 403 })
     }
     const body = await request.json()
     const data = updateContractSchema.parse(body)
@@ -104,6 +109,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { id } = await params
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (session.user.role !== UserRole.FREELANCER) {
+      return NextResponse.json({ error: "Only freelancers can delete contracts" }, { status: 403 })
     }
     await prisma.contract.deleteMany({ where: { id, userId: session.user.id } })
     return NextResponse.json({ success: true })

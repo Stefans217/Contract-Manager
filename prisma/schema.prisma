@@ -1,9 +1,15 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserRole {
+  FREELANCER
+  CLIENT
 }
 
 model User {
@@ -13,14 +19,18 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+  role          UserRole  @default(FREELANCER)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   accounts      Account[]
   sessions      Session[]
-  clients       Client[]
+  clients       Client[]          @relation("CreatedClients")
+  linkedClients Client[]          @relation("LinkedUser")
   contracts     Contract[]
   comments      Comment[]
   contractVersions ContractVersion[]
+  contractParties  ContractParty[]
+  sentInvites      ContractInvite[]  @relation("InviteSender")
 }
 
 model Account {
@@ -58,18 +68,46 @@ model VerificationToken {
 }
 
 model Client {
-  id        String     @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  company   String?
-  address   String?
-  notes     String?
-  userId    String
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contracts Contract[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id           String     @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  company      String?
+  address      String?
+  notes        String?
+  userId       String
+  linkedUserId String?
+  user         User       @relation("CreatedClients", fields: [userId], references: [id], onDelete: Cascade)
+  linkedUser   User?      @relation("LinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  contracts    Contract[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model ContractParty {
+  id         String   @id @default(cuid())
+  contractId String
+  userId     String
+  role       String   // "freelancer" or "client"
+  signedAt   DateTime?
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([contractId, userId])
+}
+
+model ContractInvite {
+  id         String    @id @default(cuid())
+  token      String    @unique @default(cuid())
+  contractId String
+  email      String
+  senderId   String
+  acceptedAt DateTime?
+  expiresAt  DateTime
+  contract   Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  sender     User      @relation("InviteSender", fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
 }
 
 model Contract {
@@ -89,6 +127,8 @@ model Contract {
   milestones   Milestone[]
   comments     Comment[]
   versions     ContractVersion[]
+  parties      ContractParty[]
+  invites      ContractInvite[]
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 }

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
-import { ContractStatus } from "@prisma/client"
+import { ContractStatus, UserRole } from "@/generated/prisma"
+import { contractWhereForUser } from "@/lib/permissions"
 
 const MOCK_CONTRACTS = [
   {
@@ -91,12 +92,14 @@ export async function GET() {
     if (!session?.user?.id) {
       return NextResponse.json(MOCK_CONTRACTS)
     }
+    const where = contractWhereForUser(session.user.id, session.user.role)
     const contracts = await prisma.contract.findMany({
-      where: { userId: session.user.id },
+      where,
       include: {
         client: { select: { name: true, company: true, email: true } },
         milestones: true,
         _count: { select: { comments: true } },
+        user: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
     })
@@ -111,6 +114,9 @@ export async function POST(request: Request) {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (session.user.role !== UserRole.FREELANCER) {
+      return NextResponse.json({ error: "Only freelancers can create contracts" }, { status: 403 })
     }
     const body = await request.json()
     const data = createContractSchema.parse(body)

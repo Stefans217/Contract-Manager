@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { FileText, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,8 +12,17 @@ import { useToast } from "@/components/ui/use-toast"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get("invite")
+  const inviteEmail = searchParams.get("email") || ""
   const { toast } = useToast()
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" })
+  const [form, setForm] = useState({
+    name: "",
+    email: inviteEmail,
+    password: "",
+    confirmPassword: "",
+    role: inviteToken ? "CLIENT" as "FREELANCER" | "CLIENT" : "FREELANCER" as "FREELANCER" | "CLIENT",
+  })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -28,14 +37,21 @@ export default function RegisterPage() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          ...(inviteToken && { inviteToken }),
+        }),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Registration failed")
       }
       toast({ title: "Account created!", description: "Please sign in with your new account" })
-      router.push("/login")
+      const redirectUrl = inviteToken ? `/login?callbackUrl=${encodeURIComponent(`/invite/${inviteToken}`)}` : "/login"
+      router.push(redirectUrl)
     } catch (err) {
       toast({
         title: "Registration failed",
@@ -65,6 +81,34 @@ export default function RegisterPage() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {/* Role selection */}
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300">I am a</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, role: "FREELANCER" })}
+                  className={`p-3 rounded-md border text-sm font-medium transition-colors ${
+                    form.role === "FREELANCER"
+                      ? "border-white bg-zinc-800 text-white"
+                      : "border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600"
+                  }`}
+                >
+                  Freelancer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, role: "CLIENT" })}
+                  className={`p-3 rounded-md border text-sm font-medium transition-colors ${
+                    form.role === "CLIENT"
+                      ? "border-white bg-zinc-800 text-white"
+                      : "border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600"
+                  }`}
+                >
+                  Client
+                </button>
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label className="text-zinc-300" htmlFor="name">Full Name</Label>
               <Input

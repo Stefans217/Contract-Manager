@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { UserRole } from "@/generated/prisma"
 
 const MOCK_METRICS = {
   totalClients: 12,
@@ -30,17 +31,27 @@ export async function GET() {
       return NextResponse.json(MOCK_METRICS)
     }
     const userId = session.user.id
-    const [totalClients, totalContracts, contracts, paidMilestones] = await Promise.all([
-      prisma.client.count({ where: { userId } }),
-      prisma.contract.count({ where: { userId } }),
+    const isFreelancer = session.user.role === UserRole.FREELANCER
+
+    const contractWhere = isFreelancer
+      ? { userId }
+      : { client: { linkedUserId: userId } }
+
+    const [totalContracts, contracts, paidMilestones] = await Promise.all([
+      prisma.contract.count({ where: contractWhere }),
       prisma.contract.findMany({
-        where: { userId },
+        where: contractWhere,
         select: { status: true, value: true },
       }),
       prisma.milestone.count({
-        where: { contract: { userId }, isPaid: true },
+        where: { contract: contractWhere, isPaid: true },
       }),
     ])
+
+    // Only freelancers see total clients count
+    const totalClients = isFreelancer
+      ? await prisma.client.count({ where: { userId } })
+      : 0
     const activeStatuses = ["EXECUTION", "REVISION", "CONTRACT", "SIGNATURE", "PAYMENT"]
     const activeContracts = contracts.filter((c) => activeStatuses.includes(c.status)).length
     const totalValue = contracts.reduce((sum, c) => sum + (c.value || 0), 0)

@@ -3,20 +3,28 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Users, FileText, LogOut, Menu, X } from "lucide-react"
-import { signOut } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 
-const navItems = [
+const freelancerNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/contracts", label: "Contracts", icon: FileText },
 ]
 
+const clientNavItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/contracts", label: "My Contracts", icon: FileText },
+]
+
 export function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { data: session } = useSession()
+  const isClient = session?.user?.role === "CLIENT"
+  const navItems = isClient ? clientNavItems : freelancerNavItems
 
   return (
     <>
@@ -72,6 +80,12 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="px-3 py-4 border-t border-zinc-800">
+          {session?.user?.name && (
+            <div className="px-3 mb-3">
+              <p className="text-sm text-white truncate">{session.user.name}</p>
+              <p className="text-xs text-zinc-500 capitalize">{(session.user.role ?? "freelancer").toLowerCase()}</p>
+            </div>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 px-3"
